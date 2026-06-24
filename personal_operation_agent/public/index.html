@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>AI Agent</title>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #0b1220;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .container {
+      width: 900px;
+      height: 650px;
+      background: #111827;
+      border-radius: 15px;
+      display: flex;
+      overflow: hidden;
+      box-shadow: 0 0 20px rgba(0,0,0,0.5);
+    }
+
+    .sidebar {
+        width: 250px;
+        background: #0f172a;
+        color: white;
+        overflow-y: auto;
+        border-right: 1px solid #374151;
+    }
+
+    .main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .header {
+      padding: 15px;
+      background: #1f2937;
+      color: white;
+      text-align: center;
+      font-weight: bold;
+    }
+
+    .chat {
+      flex: 1;
+      padding: 10px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .msg {
+      padding: 10px 12px;
+      border-radius: 10px;
+      max-width: 80%;
+      white-space: pre-wrap;
+      font-size: 14px;
+    }
+
+    .user {
+      background: #2563eb;
+      color: white;
+      align-self: flex-end;
+    }
+
+    .ai {
+      background: #374151;
+      color: white;
+      align-self: flex-start;
+    }
+
+    .input-box {
+      display: flex;
+      padding: 10px;
+      background: #1f2937;
+    }
+
+    input {
+      flex: 1;
+      padding: 12px;
+      border: none;
+      border-radius: 10px;
+      outline: none;
+      background: #0b1220;
+      color: white;
+    }
+
+    button {
+      margin-left: 10px;
+      padding: 12px 15px;
+      border: none;
+      border-radius: 10px;
+      background: #22c55e;
+      color: white;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    button:hover {
+      background: #16a34a;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <div class="sidebar" id="sidebar">
+
+    <button onclick="newChat()"
+        style="width:90%;margin:10px;padding:10px;">
+        + New Chat
+    </button>
+
+</div>
+
+    <div class="main">
+
+        <div class="header">🤖 AI Agent</div>
+
+        <div id="chat" class="chat"></div>
+
+        <div class="input-box">
+            <input id="input" placeholder="Type your message..." />
+            <button onclick="send()">Send</button>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+let currentConversationId = null;
+function addMsg(text, type) {
+
+  if (
+      text === undefined ||
+      text === null ||
+      text === "" ||
+      text === "undefined"
+  ) {
+      return;
+  }
+
+  const div = document.createElement('div');
+  div.className = 'msg ' + type;
+  div.innerText = text;
+
+  const chat = document.getElementById('chat');
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+async function send() {
+  const input = document.getElementById('input');
+  const message = input.value.trim();
+
+  if (!message) return;
+
+  if (!currentConversationId) {
+
+    const createRes = await fetch('/conversation/new', {
+        method: 'POST'
+    });
+
+    const createData = await createRes.json();
+
+    currentConversationId = createData.id;
+
+    loadConversations();
+}
+
+  addMsg(message, 'user');
+  input.value = "";
+
+  try {
+    const res = await fetch('/process', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+    message,
+    conversationId: currentConversationId
+})
+    });
+
+    const data = await res.json();
+    console.log("API RESPONSE:", data);
+    console.log("TEXT:", data.reply?.text);
+    const text =
+    data.reply?.text ||
+    data.reply?.answer ||
+    data.reply?.description ||
+    data.reply?.title ||
+    "";
+
+addMsg(text, 'ai');
+loadConversations();
+//     const r = data.reply;
+
+//     let text = "";
+
+//     if (r.answer) {
+//         text = r.answer;
+//     } else {
+//         text = `
+//     Type: ${r.type || "N/A"}
+//     Title: ${r.title || "N/A"}
+//     Description: ${r.description || "N/A"}
+//     `;
+//     }
+
+// addMsg(text, 'ai');
+//     let reply = "";
+
+//     if (data.reply?.answer) {
+//         reply = data.reply.answer;
+//     } 
+//     else if (data.reply?.message) {
+//         reply = data.reply.message;
+//     } 
+//     else if (data.reply?.description) {
+//         reply = data.reply.description;
+//     } 
+//     else if (typeof data.reply === "string") {
+//         reply = data.reply;
+//     } 
+//     else if (data.result?.response) {
+//         reply = data.result.response;
+//     } 
+//     else {
+//         reply = JSON.stringify(data.reply || data);
+//     }
+
+
+// addMsg(reply, 'ai');
+
+  } catch (err) {
+    addMsg("Error: " + err.message, 'ai');
+  }
+}
+
+//Load chat history from the server
+async function loadHistory(conversationId) {
+
+    const res = await fetch(`/history/${conversationId}`);
+
+    const messages = await res.json();
+
+    document.getElementById('chat').innerHTML = "";
+
+    messages.forEach(msg => {
+
+        addMsg(
+            msg.content,
+            msg.role === 'user' ? 'user' : 'ai'
+        );
+
+    });
+
+}
+
+async function newChat() {
+
+    currentConversationId = null;
+
+    document.getElementById('chat').innerHTML = "";
+}
+
+async function loadConversations() {
+
+    
+    const res = await fetch('/conversations');
+
+    const conversations = await res.json();
+    console.log("CONVERSATIONS:", conversations);
+
+    const sidebar = document.getElementById('sidebar');
+
+    sidebar.innerHTML = `
+        <button onclick="newChat()"
+        style="width:90%;margin:10px;padding:10px;">
+        + New Chat
+        </button>
+    `;
+
+    conversations.forEach(c => {
+
+        const div = document.createElement('div');
+
+        div.style.padding = "10px";
+        div.style.cursor = "pointer";
+
+        div.innerText = c.title;
+
+        div.onclick = () => {
+
+            currentConversationId = c.id;
+
+            loadHistory(c.id);
+
+        };
+
+        sidebar.appendChild(div);
+
+    });
+    if (conversations.length > 0 && currentConversationId === null) {
+
+    currentConversationId = conversations[0].id;
+
+    loadHistory(currentConversationId);
+
+}
+}
+
+
+// ENTER key support
+document.getElementById("input").addEventListener("keypress", function(e) {
+  if (e.key === "Enter") {
+    send();
+  }
+});
+
+loadConversations();
+</script>
+
+</body>
+</html>
