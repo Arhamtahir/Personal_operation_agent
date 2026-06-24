@@ -1,5 +1,5 @@
 # Personal Operations AI Agent
-
+// TODO: Telegram notification support
 
 Development branch testing
 
